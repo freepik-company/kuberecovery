@@ -106,10 +106,12 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 	// For each informer in the pool, we check if it is not in the new resources list
 	// If it is not in the new resources list, we stop the informer and remove it from the pool
 	for key, watcher := range existingInformers {
-		if _, exists := newInformers[key]; !exists {
-			logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", watcher.APIVersion, watcher.Resource, watcher.Namespace))
-			close(watcher.Chan)
-			r.ResourceWatcherPool.Delete(key)
+		if resource.Name == watcher.RecoveryConfigName {
+			if _, exists := newInformers[key]; !exists {
+				logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", watcher.APIVersion, watcher.Resource, watcher.Namespace))
+				close(watcher.Chan)
+				r.ResourceWatcherPool.Delete(key)
+			}
 		}
 	}
 
