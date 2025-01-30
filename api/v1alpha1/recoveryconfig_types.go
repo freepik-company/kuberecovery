@@ -28,7 +28,7 @@ type RetentionT struct {
 // GvkResource TODO
 type GvrResourceT struct {
 	APIVersion string   `json:"apiVersion"`
-	Kind       []string `json:"kind"`
+	Resources  []string `json:"resources"`
 	Namespaces []string `json:"namespaces,omitempty"`
 }
 

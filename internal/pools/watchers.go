@@ -23,7 +23,7 @@ import (
 // ResourceWatcher
 type ResourceWatcher struct {
 	RecoveryConfigName string
-	Kind               string
+	Resource           string
 	APIVersion         string
 	Namespace          string
 	Chan               chan struct{}

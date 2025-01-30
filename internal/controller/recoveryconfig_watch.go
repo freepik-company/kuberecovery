@@ -50,7 +50,7 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 	// N = Namespace is a string array, so multiple namespaces by ResourceIncluded is allowed
 	for _, res := range resource.Spec.ResourcesIncluded {
 		// Kind must be an array so, for each kind, we create an informer
-		for _, kind := range res.Kind {
+		for _, rsc := range res.Resources {
 			// If no namespace is specified or the wildcard is used, we watch all namespaces
 			namespaces := res.Namespaces
 			if len(namespaces) == 0 || (len(namespaces) == 1 && namespaces[0] == "*") {
@@ -61,7 +61,7 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 			for _, ns := range namespaces {
 
 				// Key to store the informer in the pool
-				resourceWatcherKey := fmt.Sprintf("%s/%s/%s/%s", resource.Name, res.APIVersion, kind, ns)
+				resourceWatcherKey := fmt.Sprintf("%s/%s/%s/%s", resource.Name, res.APIVersion, rsc, ns)
 				newInformers[resourceWatcherKey] = true
 
 				// Check if the informer is already created and added to the pool
@@ -70,7 +70,7 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 				// If the informer is in the pool and the event type is Deleted, we remove it from the pool
 				// and stop the informer
 				if exists && eventType == watch.Deleted {
-					logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", res.APIVersion, kind, ns))
+					logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", res.APIVersion, rsc, ns))
 					// Delete the resource watcher from the pool and close the channel
 					r.ResourceWatcherPool.Delete(resourceWatcherKey)
 					close(resourceWatcher.Chan)
@@ -81,13 +81,13 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 				if !exists {
 
 					// Log the resource we are going to watch
-					logger.Info(fmt.Sprintf("Watching %s/%s in namespace %s", res.APIVersion, kind, ns))
+					logger.Info(fmt.Sprintf("Watching %s/%s in namespace %s", res.APIVersion, rsc, ns))
 
 					// Create the resource watcher to add it to the pool
 					resourceWatcher := &pools.ResourceWatcher{
 						RecoveryConfigName: resource.Name,
 						APIVersion:         res.APIVersion,
-						Kind:               kind,
+						Resource:           rsc,
 						Namespace:          ns,
 						Chan:               make(chan struct{}),
 					}
@@ -107,7 +107,7 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 	// If it is not in the new resources list, we stop the informer and remove it from the pool
 	for key, watcher := range existingInformers {
 		if _, exists := newInformers[key]; !exists {
-			logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", watcher.APIVersion, watcher.Kind, watcher.Namespace))
+			logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", watcher.APIVersion, watcher.Resource, watcher.Namespace))
 			close(watcher.Chan)
 			r.ResourceWatcherPool.Delete(key)
 		}
@@ -134,7 +134,7 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 	gvr := &schema.GroupVersionResource{
 		Group:    group,
 		Version:  apiVersion,
-		Resource: resourceWatcher.Kind,
+		Resource: resourceWatcher.Resource,
 	}
 
 	// Creates the informer factory for the resource and the namespaces specified in the resourceWatcher
@@ -163,7 +163,7 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 			}
 
 			// Get the plural kind of the resource
-			kind, err := getPluralKind(unstructuredObj.GroupVersionKind().Group,
+			resource, err := getResourceFromKind(unstructuredObj.GroupVersionKind().Group,
 				unstructuredObj.GroupVersionKind().Version, unstructuredObj.GroupVersionKind().Kind)
 			if err != nil {
 				logger.Error(err, "Failed to get plural kind")
@@ -172,11 +172,11 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 
 			// Check if the resource is excluded to save it as RecoveryResource
 			for _, excluded := range recoveryConfig.Spec.ResourcesExcluded {
-				for _, excludedKind := range excluded.Kind {
+				for _, excludedKind := range excluded.Resources {
 					for _, excludedNamespace := range excluded.Namespaces {
 
 						// kind and namespace can be regex
-						kindMatched, err := regexp.MatchString(excludedKind, kind)
+						kindMatched, err := regexp.MatchString(excludedKind, resource)
 						if err != nil {
 							logger.Error(err, "Failed to match kind")
 							return
@@ -190,7 +190,7 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 						// Check if the resource is excluded, if true we do not save it as RecoveryResource
 						if excluded.APIVersion == unstructuredObj.GetAPIVersion() && kindMatched && namespaceMatched {
 							logger.Info(fmt.Sprintf("Resource %s/%s/%s is excluded from recovery",
-								unstructuredObj.GetAPIVersion(), kind, unstructuredObj.GetNamespace()))
+								unstructuredObj.GetAPIVersion(), resource, unstructuredObj.GetNamespace()))
 							return
 						}
 					}

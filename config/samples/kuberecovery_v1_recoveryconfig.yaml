@@ -12,10 +12,10 @@ spec:
   # For namespaces use "*" to watch all namespaces
   resourcesIncluded:
     - apiVersion: "apps/v1"
-      kind: ["deployments"]
+      resources: ["deployments"]
       namespaces: ["*"]
     - apiVersion: "v1"
-      kind: ["services"]
+      resources: ["services"]
       namespaces: ["*"]
 
   # Resources to exclude from watching and saving as RecoveryResource object
@@ -24,7 +24,7 @@ spec:
   # or defau* to exclude all resources that start with defau
   resourcesExcluded:
     - apiVersion: "v1"
-      kind: ["services"]
+      resources: ["services"]
       namespaces: ["kube-system"]
 
   # Retention period for RecoveryResource objects

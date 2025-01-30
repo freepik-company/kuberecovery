@@ -50,8 +50,8 @@ const (
 	recoveryResourceRecoveryConfigLabel = "kuberecovery.freepik.com/recoveryConfig"
 )
 
-// getPluralKind
-func getPluralKind(group, version, kind string) (string, error) {
+// getResourceFromKind
+func getResourceFromKind(group, version, kind string) (string, error) {
 
 	//
 	discoveryClient := globals.Application.KubeRawCoreClient.Discovery()

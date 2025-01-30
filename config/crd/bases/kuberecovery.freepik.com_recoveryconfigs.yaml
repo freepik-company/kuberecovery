@@ -45,17 +45,17 @@ spec:
                   properties:
                     apiVersion:
                       type: string
-                    kind:
+                    namespaces:
                       items:
                         type: string
                       type: array
-                    namespaces:
+                    resources:
                       items:
                         type: string
                       type: array
                   required:
                   - apiVersion
-                  - kind
+                  - resources
                   type: object
                 type: array
               resourcesIncluded:
@@ -64,17 +64,17 @@ spec:
                   properties:
                     apiVersion:
                       type: string
-                    kind:
+                    namespaces:
                       items:
                         type: string
                       type: array
-                    namespaces:
+                    resources:
                       items:
                         type: string
                       type: array
                   required:
                   - apiVersion
-                  - kind
+                  - resources
                   type: object
                 type: array
               retention:
