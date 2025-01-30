@@ -20,15 +20,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"freepik.com/kuberecovery/internal/globals"
+	"k8s.io/client-go/dynamic"
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"time"
 
 	kuberecoveryv1alpha1 "freepik.com/kuberecovery/api/v1alpha1"
+	"freepik.com/kuberecovery/internal/globals"
 )
 
 // Sync checks if the resource is expired and deletes it if it is
@@ -38,13 +40,22 @@ func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 
 	logger := log.FromContext(ctx)
 
+	// Add extra finalizer to the resource and just remove it if the retainUntil label has a past date
+	if !controllerutil.ContainsFinalizer(resource, recoveryResourceExtraFinalizer) {
+		controllerutil.AddFinalizer(resource, recoveryResourceExtraFinalizer)
+		err = r.Update(ctx, resource)
+		if err != nil {
+			return fmt.Errorf(addExtraFinalizerError, resource.Name, err)
+		}
+	}
+
 	// Get validUntil label from the resource
-	validUnitlLabel := resource.GetLabels()[recoveryResourceRetainUntilLabel]
+	validUntilLabel := resource.GetLabels()[recoveryResourceRetainUntilLabel]
 
 	// Parse the validUntil label to get the time
-	validUntil, err := time.Parse("2006-01-02T150405", validUnitlLabel)
+	validUntil, err := time.Parse(timeParseFormat, validUntilLabel)
 	if err != nil {
-		return fmt.Errorf("error parsing valid until label %s: %w", validUnitlLabel, err)
+		return fmt.Errorf(timeParseError, err)
 	}
 
 	// Check if the resource is expired
@@ -52,47 +63,38 @@ func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 
 		// If the resource is expired, delete it.
 		// First remove the finalizer and then delete the resource
-		logger.Info(fmt.Sprintf("Resource %s is expired, deleting it", resource.Name))
+		logger.Info(fmt.Sprintf(resourceExpiredMessage, resource.Name))
 		if controllerutil.ContainsFinalizer(resource, recoveryResourceExtraFinalizer) {
 			controllerutil.RemoveFinalizer(resource, recoveryResourceExtraFinalizer)
 			err = r.Update(ctx, resource)
 			if err != nil {
-				return fmt.Errorf("error deleting extra finalizer to resource %s: %w", resource.Name, err)
+				return fmt.Errorf(deleteExtraFinalizerError, resource.Name, err)
 			}
 		}
 		err = r.Delete(ctx, resource)
 		if err != nil {
-			return fmt.Errorf("error deleting resource %s: %w", resource.Name, err)
+			return fmt.Errorf(resourceDeleteError, resource.Name, err)
 		}
+
 		return nil
 	}
 
-	// Add extra finalizer to the resource and just remove it if the retainUntil label has a past date
-	if !controllerutil.ContainsFinalizer(resource, recoveryResourceExtraFinalizer) {
-		controllerutil.AddFinalizer(resource, recoveryResourceExtraFinalizer)
-		err = r.Update(ctx, resource)
-		if err != nil {
-			return fmt.Errorf("error adding extra finalizer to resource %s: %w", resource.Name, err)
-		}
-	}
-
-	// Get resotre label trigger. If it is present, restore the resource
+	// Get restore label trigger. If it is present, restore the resource
 	restoreTriggerLabel := resource.GetLabels()[recoveryResourceRestoreLabel]
-	if restoreTriggerLabel == "true" {
-		logger.Info(fmt.Sprintf("Resource %s has restore label, restoring it", resource.Name))
+	if restoreTriggerLabel == recoveryResourceRestoreLabelValue {
+		logger.Info(fmt.Sprintf(resourceRestoreMessage, resource.Name))
 
-		// Restore the resource
+		// Unmarshal the RawExtension to the object to get unstructured.Unstructured
 		var resourceToRestore unstructured.Unstructured
-
 		if err := json.Unmarshal(resource.Spec.Raw, &resourceToRestore.Object); err != nil {
-			return fmt.Errorf("error deserializing RawExtension: %v", err)
+			return fmt.Errorf(deserializingRawExtensionError, err)
 		}
 
 		// Create the GVR for the RecoveryResource
 		res, err := getResourceFromKind(resourceToRestore.GroupVersionKind().Group,
 			resourceToRestore.GroupVersionKind().Version, resourceToRestore.GroupVersionKind().Kind)
 		if err != nil {
-			return fmt.Errorf("error getting resource from kind: %w", err)
+			return fmt.Errorf(getResourceFromKindError, err)
 		}
 		gvr := schema.GroupVersionResource{
 			Group:    resourceToRestore.GroupVersionKind().Group,
@@ -100,26 +102,27 @@ func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 			Resource: res,
 		}
 
-		// Clean resourceToCreate
-		unstructured.RemoveNestedField(resourceToRestore.Object, "metadata", "resourceVersion")
-		unstructured.RemoveNestedField(resourceToRestore.Object, "metadata", "uid")
-		unstructured.RemoveNestedField(resourceToRestore.Object, "metadata", "creationTimestamp")
-
-		// Create the dynamic client for the RecoveryResource
-		dynamicClient := globals.Application.KubeRawClient.Resource(gvr).Namespace(resourceToRestore.GetNamespace())
-
-		// Save the RecoveryResource in the cluster
-		_, err = dynamicClient.Create(ctx, &resourceToRestore, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("error creating resource %s in the cluster: %w", resourceToRestore.GetName(), err)
+		// Create the dynamic client for the RecoveryResource for namespaced and cluster-scoped resources
+		var dynamicClient dynamic.ResourceInterface
+		if resourceToRestore.GetNamespace() != "" {
+			dynamicClient = globals.Application.KubeRawClient.Resource(gvr).Namespace(resourceToRestore.GetNamespace())
+		} else {
+			dynamicClient = globals.Application.KubeRawClient.Resource(gvr)
 		}
 
-		// Remove the restore label
+		// Create the resource saved in the RecoveryResource spec
+		_, err = dynamicClient.Create(ctx, &resourceToRestore, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf(createResourceError, resourceToRestore.GetName(), err)
+		}
+
+		// Remove the restore label to avoid restoring the resource again
 		delete(resource.GetLabels(), recoveryResourceRestoreLabel)
 		err = r.Update(ctx, resource)
 		if err != nil {
-			return fmt.Errorf("error deleting restore label from resource %s: %w", resource.Name, err)
+			return fmt.Errorf(deleteRestoreLabelError, resource.Name, err)
 		}
 	}
+
 	return nil
 }

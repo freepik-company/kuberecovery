@@ -36,6 +36,12 @@ import (
 	"freepik.com/kuberecovery/internal/pools"
 )
 
+// fields excluded to save in the RecoveryResource spec
+var fieldsExcludedFromRecoveryResource = map[string][]string{
+	"metadata": {"resourceVersion", "uid", "creationTimestamp"},
+}
+
+// Watch watches the resources included in the RecoveryConfig and creates informers to watch delete events
 func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.EventType,
 	resource *kuberecoveryv1alpha1.RecoveryConfig) (err error) {
 
@@ -44,12 +50,12 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 	newInformers := make(map[string]bool)
 
 	// For each GVR included in the ResourcesIncluded section of the RecoveryConfig, we create an informer to watch
-	//delete events on the resources
+	// delete events on the resources
 	// GV = GroupVersion (APIVersion) is a string, so just one group by ResourceIncluded is allowed
-	// K = Kind is a string array, so multiple kinds by ResourceIncluded is allowed
+	// R = Resources is a string array, so multiple resources by ResourceIncluded is allowed
 	// N = Namespace is a string array, so multiple namespaces by ResourceIncluded is allowed
 	for _, res := range resource.Spec.ResourcesIncluded {
-		// Kind must be an array so, for each kind, we create an informer
+		// Resources must be an array so, for each resource, we create an informer
 		for _, rsc := range res.Resources {
 			// If no namespace is specified or the wildcard is used, we watch all namespaces
 			namespaces := res.Namespaces
@@ -61,7 +67,9 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 			for _, ns := range namespaces {
 
 				// Key to store the informer in the pool
-				resourceWatcherKey := fmt.Sprintf("%s/%s/%s/%s", resource.Name, res.APIVersion, rsc, ns)
+				resourceWatcherKey := fmt.Sprintf(pools.ResourceWatcherPoolKeyFormat, resource.Name, res.APIVersion, rsc, ns)
+
+				// Store the informer in the newInformers map to check if it is already in the pool
 				newInformers[resourceWatcherKey] = true
 
 				// Check if the informer is already created and added to the pool
@@ -70,7 +78,7 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 				// If the informer is in the pool and the event type is Deleted, we remove it from the pool
 				// and stop the informer
 				if exists && eventType == watch.Deleted {
-					logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", res.APIVersion, rsc, ns))
+					logger.Info(fmt.Sprintf(stopWatchingResourceMessage, res.APIVersion, rsc, ns))
 					// Delete the resource watcher from the pool and close the channel
 					r.ResourceWatcherPool.Delete(resourceWatcherKey)
 					close(resourceWatcher.Chan)
@@ -81,7 +89,7 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 				if !exists {
 
 					// Log the resource we are going to watch
-					logger.Info(fmt.Sprintf("Watching %s/%s in namespace %s", res.APIVersion, rsc, ns))
+					logger.Info(fmt.Sprintf(startWatchingResourceMessage, res.APIVersion, rsc, ns))
 
 					// Create the resource watcher to add it to the pool
 					resourceWatcher := &pools.ResourceWatcher{
@@ -108,7 +116,7 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 	for key, watcher := range existingInformers {
 		if resource.Name == watcher.RecoveryConfigName {
 			if _, exists := newInformers[key]; !exists {
-				logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", watcher.APIVersion, watcher.Resource, watcher.Namespace))
+				logger.Info(fmt.Sprintf(stopWatchingResourceMessage, watcher.APIVersion, watcher.Resource, watcher.Namespace))
 				close(watcher.Chan)
 				r.ResourceWatcherPool.Delete(key)
 			}
@@ -132,7 +140,7 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 		apiVersion = apiVersion[idx+1:]
 	}
 
-	// Create the GVR for the resource
+	// Create the GVR for the resource to watch
 	gvr := &schema.GroupVersionResource{
 		Group:    group,
 		Version:  apiVersion,
@@ -159,40 +167,39 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 			// Get the object deleted as unstructured object
 			unstructuredObj, ok := obj.(*unstructured.Unstructured)
 			if !ok {
-				logger.Error(fmt.Errorf("failed to convert object to unstructured"),
-					"Failed to delete resource")
+				logger.Info(fmt.Sprintf(convertToUnstructuredError, obj))
 				return
 			}
 
-			// Get the plural kind of the resource
+			// Get the resource name from the group, version and kind
 			resource, err := getResourceFromKind(unstructuredObj.GroupVersionKind().Group,
 				unstructuredObj.GroupVersionKind().Version, unstructuredObj.GroupVersionKind().Kind)
 			if err != nil {
-				logger.Error(err, "Failed to get plural kind")
+				logger.Info(getResourceFromKindError, err)
 				return
 			}
 
 			// Check if the resource is excluded to save it as RecoveryResource
 			for _, excluded := range recoveryConfig.Spec.ResourcesExcluded {
-				for _, excludedKind := range excluded.Resources {
+				for _, excludedResource := range excluded.Resources {
 					for _, excludedNamespace := range excluded.Namespaces {
 
-						// kind and namespace can be regex
-						kindMatched, err := regexp.MatchString(excludedKind, resource)
+						// resource and namespace can be regex
+						resourceMatched, err := regexp.MatchString(excludedResource, resource)
 						if err != nil {
-							logger.Error(err, "Failed to match kind")
+							logger.Info(fmt.Sprintf(regexResourceError, resource, err))
 							return
 						}
 						namespaceMatched, err := regexp.MatchString(excludedNamespace, unstructuredObj.GetNamespace())
 						if err != nil {
-							logger.Error(err, "Failed to match namespace")
+							logger.Info(fmt.Sprintf(regexNamespaceError, unstructuredObj.GetNamespace(), err))
 							return
 						}
 
 						// Check if the resource is excluded, if true we do not save it as RecoveryResource
-						if excluded.APIVersion == unstructuredObj.GetAPIVersion() && kindMatched && namespaceMatched {
-							logger.Info(fmt.Sprintf("Resource %s/%s/%s is excluded from recovery",
-								unstructuredObj.GetAPIVersion(), resource, unstructuredObj.GetNamespace()))
+						if excluded.APIVersion == unstructuredObj.GetAPIVersion() && resourceMatched && namespaceMatched {
+							logger.Info(fmt.Sprintf(resourceExcludedFromRecoveryMessage, unstructuredObj.GetAPIVersion(),
+								resource, unstructuredObj.GetNamespace()))
 							return
 						}
 					}
@@ -200,40 +207,48 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 			}
 
 			// Save the resource as RecoveryResource
-			err = r.saveRecoveryResource(ctx, unstructuredObj, recoveryConfig)
+			recoveryResourceName, err := r.saveRecoveryResource(ctx, unstructuredObj, recoveryConfig)
 			if err != nil {
-				logger.Error(err, "Failed to save recovery resource")
+				logger.Info(fmt.Sprintf(saveRecoveryResourceError, unstructuredObj.GetAPIVersion(), resource,
+					unstructuredObj.GetNamespace(), unstructuredObj.GetName(), err))
+				return
 			}
-			logger.Info(fmt.Sprintf("Resource %s/%s/%s/%s saved as RecoveryResource",
+			logger.Info(fmt.Sprintf(recoveryResourceSavedMessage,
 				unstructuredObj.GetAPIVersion(), unstructuredObj.GetKind(), unstructuredObj.GetNamespace(),
-				unstructuredObj.GetName()))
+				unstructuredObj.GetName(), recoveryResourceName))
 
 		},
 	})
 	if err != nil {
-		logger.Error(err, "Failed to add event handler")
+		logger.Info(fmt.Sprintf(resourceWatcherError, resourceWatcher.APIVersion, resourceWatcher.Resource, err))
 	}
 
 	// Run the informer until the channel stored in the pool is closed
 	informer.Run(resourceWatcher.Chan)
 }
 
-// saveRecoveryResource saves the resource as RecoveryResource in the cluster
+// saveRecoveryResource saves the resource deleted as RecoveryResource in the cluster
 func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj *unstructured.Unstructured,
-	recoveryConfig *kuberecoveryv1alpha1.RecoveryConfig) (err error) {
+	recoveryConfig *kuberecoveryv1alpha1.RecoveryConfig) (recoveryResourceName string, err error) {
 
-	// Get the retention time for the RecoveryResource created
+	// Get the retention time for the RecoveryResource created and parse it
 	retentionPeriod := recoveryConfig.Spec.Retention.Period
 	parsedRetentionPeriod, err := time.ParseDuration(retentionPeriod)
 	if err != nil {
-		return fmt.Errorf("failed to parse retention period: %w", err)
+		return recoveryResourceName, fmt.Errorf(timeParseError, err)
 	}
 
-	// Calculate the retention time for the RecoveryResource created
-	recoveryResourceName := fmt.Sprintf("%s-%s-%s-%s", recoveryConfig.Name, strings.ToLower(obj.GetKind()),
-		obj.GetName(), metav1.Now().UTC().Format("20060102150405"))
-	savedAt := metav1.Now().UTC().Format("2006-01-02T150405")
-	retentionUntil := metav1.Now().UTC().Add(parsedRetentionPeriod).Format("2006-01-02T150405")
+	// Create the labels for the RecoveryResource: Name, savedAt and retainUntil
+	now := metav1.Now().UTC()
+	recoveryResourceName = fmt.Sprintf(recoveryResourceNameFormat, recoveryConfig.Name, strings.ToLower(obj.GetKind()),
+		obj.GetName(), now.Format(timeParseFormatName))
+	savedAt := now.Format(timeParseFormat)
+	retainUntil := now.Add(parsedRetentionPeriod).Format(timeParseFormat)
+
+	// Remove the fields that are not needed in the RecoveryResource
+	for _, field := range fieldsExcludedFromRecoveryResource {
+		unstructured.RemoveNestedField(obj.Object, field...)
+	}
 
 	// Create the RecoveryResource object
 	recoveryObj := &unstructured.Unstructured{
@@ -244,7 +259,7 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 				"name": recoveryResourceName,
 				"labels": map[string]interface{}{
 					recoveryResourceSavedAtLabel:        savedAt,
-					recoveryResourceRetainUntilLabel:    retentionUntil,
+					recoveryResourceRetainUntilLabel:    retainUntil,
 					recoveryResourceRecoveryConfigLabel: recoveryConfig.Name,
 				},
 			},
@@ -265,8 +280,8 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 	// Save the RecoveryResource in the cluster
 	_, err = dynamicClient.Create(ctx, recoveryObj, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("error creating recoveryResource %s in the cluster: %w", recoveryObj.GetName(), err)
+		return recoveryResourceName, fmt.Errorf(recoveryResourceCreationError, recoveryObj.GetName(), err)
 	}
 
-	return nil
+	return recoveryResourceName, nil
 }

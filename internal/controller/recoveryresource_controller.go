@@ -39,6 +39,7 @@ type RecoveryResourceReconciler struct {
 // +kubebuilder:rbac:groups=kuberecovery.freepik.com,resources=recoveryresources,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kuberecovery.freepik.com,resources=recoveryresources/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kuberecovery.freepik.com,resources=recoveryresources/finalizers,verbs=update
+// +kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch;create
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

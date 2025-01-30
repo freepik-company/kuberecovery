@@ -29,6 +29,10 @@ type ResourceWatcher struct {
 	Chan               chan struct{}
 }
 
+var (
+	ResourceWatcherPoolKeyFormat = "%s/%s/%s/%s"
+)
+
 // ResourceWatcherStore
 type ResourceWatcherStore struct {
 	mu    sync.RWMutex
