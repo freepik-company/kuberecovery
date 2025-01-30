@@ -18,7 +18,12 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"freepik.com/kuberecovery/internal/globals"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"time"
@@ -68,6 +73,52 @@ func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 		err = r.Update(ctx, resource)
 		if err != nil {
 			return fmt.Errorf("error adding extra finalizer to resource %s: %w", resource.Name, err)
+		}
+	}
+
+	// Get resotre label trigger. If it is present, restore the resource
+	restoreTriggerLabel := resource.GetLabels()[recoveryResourceRestoreLabel]
+	if restoreTriggerLabel == "true" {
+		logger.Info(fmt.Sprintf("Resource %s has restore label, restoring it", resource.Name))
+
+		// Restore the resource
+		var resourceToRestore unstructured.Unstructured
+
+		if err := json.Unmarshal(resource.Spec.Raw, &resourceToRestore.Object); err != nil {
+			return fmt.Errorf("error deserializing RawExtension: %v", err)
+		}
+
+		// Create the GVR for the RecoveryResource
+		res, err := getResourceFromKind(resourceToRestore.GroupVersionKind().Group,
+			resourceToRestore.GroupVersionKind().Version, resourceToRestore.GroupVersionKind().Kind)
+		if err != nil {
+			return fmt.Errorf("error getting resource from kind: %w", err)
+		}
+		gvr := schema.GroupVersionResource{
+			Group:    resourceToRestore.GroupVersionKind().Group,
+			Version:  resourceToRestore.GroupVersionKind().Version,
+			Resource: res,
+		}
+
+		// Clean resourceToCreate
+		unstructured.RemoveNestedField(resourceToRestore.Object, "metadata", "resourceVersion")
+		unstructured.RemoveNestedField(resourceToRestore.Object, "metadata", "uid")
+		unstructured.RemoveNestedField(resourceToRestore.Object, "metadata", "creationTimestamp")
+
+		// Create the dynamic client for the RecoveryResource
+		dynamicClient := globals.Application.KubeRawClient.Resource(gvr).Namespace(resourceToRestore.GetNamespace())
+
+		// Save the RecoveryResource in the cluster
+		_, err = dynamicClient.Create(ctx, &resourceToRestore, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("error creating resource %s in the cluster: %w", resourceToRestore.GetName(), err)
+		}
+
+		// Remove the restore label
+		delete(resource.GetLabels(), recoveryResourceRestoreLabel)
+		err = r.Update(ctx, resource)
+		if err != nil {
+			return fmt.Errorf("error deleting restore label from resource %s: %w", resource.Name, err)
 		}
 	}
 	return nil

@@ -48,6 +48,7 @@ const (
 	recoveryResourceRetainUntilLabel    = "kuberecovery.freepik.com/retentionUntil"
 	recoveryResourceSavedAtLabel        = "kuberecovery.freepik.com/savedAt"
 	recoveryResourceRecoveryConfigLabel = "kuberecovery.freepik.com/recoveryConfig"
+	recoveryResourceRestoreLabel        = "kuberecovery.freepik.com/restore"
 )
 
 // getResourceFromKind
