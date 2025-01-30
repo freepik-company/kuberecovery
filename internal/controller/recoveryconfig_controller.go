@@ -89,7 +89,7 @@ func (r *RecoveryConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// 4. Add finalizer to the RecoveryConfig CR
-	if !kubeRecoveryConfig.DeletionTimestamp.IsZero() {
+	if kubeRecoveryConfig.DeletionTimestamp.IsZero() {
 		controllerutil.AddFinalizer(kubeRecoveryConfig, resourceFinalizer)
 		err = r.Update(ctx, kubeRecoveryConfig)
 		if err != nil {

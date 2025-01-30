@@ -18,19 +18,55 @@ package controller
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/watch"
+	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"time"
 
 	kuberecoveryv1alpha1 "freepik.com/kuberecovery/api/v1alpha1"
 )
 
-func (r *RecoveryResourceReconciler) Sync(ctx context.Context, eventType watch.EventType,
+func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 	resource *kuberecoveryv1alpha1.RecoveryResource) (err error) {
 
 	logger := log.FromContext(ctx)
 
-	logger.Info("Syncing resource %s/%s", resource.Namespace, resource.Name)
+	// Get validUntil label from the resource
+	validUnitlLabel := resource.GetLabels()[recoveryResourceRetainUntilLabel]
+
+	// Parse the validUntil label to get the time
+	validUntil, err := time.Parse("2006-01-02T150405", validUnitlLabel)
+	if err != nil {
+		logger.Error(err, "Error parsing valid until label %s", validUnitlLabel)
+	}
+
+	// Check if the resource is expired
+	if time.Now().UTC().After(validUntil) {
+
+		// If the resource is expired, delete it.
+		// First remove the finalizer and then delete the resource
+		logger.Info(fmt.Sprintf("Resource %s is expired, deleting it", resource.Name))
+		if controllerutil.ContainsFinalizer(resource, recoveryResourceExtraFinalizer) {
+			controllerutil.RemoveFinalizer(resource, recoveryResourceExtraFinalizer)
+			err = r.Update(ctx, resource)
+			if err != nil {
+				return fmt.Errorf("error deleting extra finalizer to resource %s: %w", resource.Name, err)
+			}
+		}
+		err = r.Delete(ctx, resource)
+		if err != nil {
+			logger.Error(err, "error deleting resource %s", resource.Name)
+		}
+		return nil
+	}
 
 	// Add extra finalizer to the resource and just remove it if the retainUntil label has a past date
+	if !controllerutil.ContainsFinalizer(resource, recoveryResourceExtraFinalizer) {
+		controllerutil.AddFinalizer(resource, recoveryResourceExtraFinalizer)
+		err = r.Update(ctx, resource)
+		if err != nil {
+			return fmt.Errorf("error adding extra finalizer to resource %s: %w", resource.Name, err)
+		}
+	}
 	return nil
 }

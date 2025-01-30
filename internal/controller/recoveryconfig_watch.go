@@ -216,8 +216,8 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 	}
 
 	// Calculate the retention time for the RecoveryResource created
-	savedAt := metav1.Now().Format("2006-01-02T150405")
-	retentionUntil := metav1.Now().Add(parsedRetentionPeriod).Format("2006-01-02T150405")
+	savedAt := metav1.Now().UTC().Format("2006-01-02T150405")
+	retentionUntil := metav1.Now().UTC().Add(parsedRetentionPeriod).Format("2006-01-02T150405")
 
 	// Create the RecoveryResource object
 	recoveryObj := &unstructured.Unstructured{
@@ -227,9 +227,9 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 			"metadata": map[string]interface{}{
 				"name": fmt.Sprintf("%s-%s-%s", recoveryConfig.Name, strings.ToLower(obj.GetKind()), obj.GetName()),
 				"labels": map[string]interface{}{
-					"kuberecovery.freepik.com/savedAt":        savedAt,
-					"kuberecovery.freepik.com/retentionUntil": retentionUntil,
-					"kuberecovery.freepik.com/recoveryConfig": recoveryConfig.Name,
+					recoveryResourceSavedAtLabel:        savedAt,
+					recoveryResourceRetainUntilLabel:    retentionUntil,
+					recoveryResourceRecoveryConfigLabel: recoveryConfig.Name,
 				},
 			},
 			"spec": obj.Object,

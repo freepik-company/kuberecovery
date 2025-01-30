@@ -41,7 +41,13 @@ const (
 	syncTargetError                = "can not sync the target for the %s '%s': %s"
 
 	// Finalizer
-	resourceFinalizer = "kuberecovery.freepik.com/finalizer"
+	resourceFinalizer              = "kuberecovery.freepik.com/finalizer"
+	recoveryResourceExtraFinalizer = "kuberecovery.freepik.com/protectFinalizer"
+
+	// Labels
+	recoveryResourceRetainUntilLabel    = "kuberecovery.freepik.com/retentionUntil"
+	recoveryResourceSavedAtLabel        = "kuberecovery.freepik.com/savedAt"
+	recoveryResourceRecoveryConfigLabel = "kuberecovery.freepik.com/recoveryConfig"
 )
 
 // getPluralKind

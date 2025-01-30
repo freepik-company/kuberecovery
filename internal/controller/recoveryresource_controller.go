@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
@@ -70,25 +69,20 @@ func (r *RecoveryResourceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// 3. Check if the RecoveryResource resource is marked to be deleted: indicated by the deletion timestamp being set
 	if !kubeRecoveryResource.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(kubeRecoveryResource, resourceFinalizer) {
-
-			// 3.1 Delete the resources associated with the QueryConnector
-			err = r.Sync(ctx, watch.Deleted, kubeRecoveryResource)
-
 			// Remove the finalizers on Patch CR
 			controllerutil.RemoveFinalizer(kubeRecoveryResource, resourceFinalizer)
 			err = r.Update(ctx, kubeRecoveryResource)
 			if err != nil {
 				logger.Info(fmt.Sprintf(resourceFinalizersUpdateError, recoveryResourceType, req.NamespacedName, err.Error()))
 			}
+			result = ctrl.Result{}
+			err = nil
+			return result, err
 		}
-
-		result = ctrl.Result{}
-		err = nil
-		return result, err
 	}
 
 	// 4. Add finalizer to the RecoveryResource CR
-	if !kubeRecoveryResource.DeletionTimestamp.IsZero() {
+	if kubeRecoveryResource.DeletionTimestamp.IsZero() {
 		controllerutil.AddFinalizer(kubeRecoveryResource, resourceFinalizer)
 		err = r.Update(ctx, kubeRecoveryResource)
 		if err != nil {
@@ -105,7 +99,7 @@ func (r *RecoveryResourceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}()
 
 	// 6. Schedule periodical request
-	RequeueTime, err := time.ParseDuration("1m")
+	RequeueTime, err := time.ParseDuration(defaultSyncInterval)
 	if err != nil {
 		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, recoveryResourceType, req.NamespacedName, err.Error()))
 		return result, err
@@ -115,7 +109,7 @@ func (r *RecoveryResourceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// 7. Check if the resource can be deleted
-	err = r.Sync(ctx, watch.Modified, kubeRecoveryResource)
+	err = r.Sync(ctx, kubeRecoveryResource)
 	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(kubeRecoveryResource)
 		logger.Info(fmt.Sprintf(syncTargetError, recoveryResourceType, req.NamespacedName, err.Error()))
