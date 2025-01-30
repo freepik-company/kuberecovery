@@ -1,0 +1,23 @@
+# permissions for end users to view recoveryconfigs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: kuberecovery
+    app.kubernetes.io/managed-by: kustomize
+  name: recoveryconfig-viewer-role
+rules:
+- apiGroups:
+  - kuberecovery.freepik.com
+  resources:
+  - recoveryconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kuberecovery.freepik.com
+  resources:
+  - recoveryconfigs/status
+  verbs:
+  - get

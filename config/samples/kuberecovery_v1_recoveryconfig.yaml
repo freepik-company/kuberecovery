@@ -1,0 +1,33 @@
+apiVersion: kuberecovery.freepik.com/v1alpha1
+kind: RecoveryConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: kuberecovery
+    app.kubernetes.io/managed-by: kustomize
+  name: recoveryconfig-sample
+spec:
+
+  # Resources to watch and save as RecoveryResource object when they are deleted
+  # apiVersion and kind * is not supported, use specific version and kind instead
+  # For namespaces use "*" to watch all namespaces
+  resourcesIncluded:
+    - apiVersion: "apps/v1"
+      kind: ["deployments"]
+      namespaces: ["*"]
+    - apiVersion: "v1"
+      kind: ["services"]
+      namespaces: ["*"]
+
+  # Resources to exclude from watching and saving as RecoveryResource object
+  # apiVersion * is not supported, use specific apiVersion instead
+  # Namespaces and kind regexp are supported, so you can define * to exclude all resources of a kind or namespace
+  # or defau* to exclude all resources that start with defau
+  resourcesExcluded:
+    - apiVersion: "v1"
+      kind: ["services"]
+      namespaces: ["kube-system"]
+
+  # Retention period for RecoveryResource objects
+  # Just support us, ns, ms, s, m and h as time units
+  retention:
+    period: 240h

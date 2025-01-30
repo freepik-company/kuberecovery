@@ -1,0 +1,35 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - kuberecovery.freepik.com
+  resources:
+  - recoveryconfigs
+  - recoveryresources
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kuberecovery.freepik.com
+  resources:
+  - recoveryconfigs/finalizers
+  - recoveryresources/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kuberecovery.freepik.com
+  resources:
+  - recoveryconfigs/status
+  - recoveryresources/status
+  verbs:
+  - get
+  - patch
+  - update

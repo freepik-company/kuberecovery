@@ -1,0 +1,23 @@
+apiVersion: kuberecovery.freepik.com/v1alpha1
+kind: RecoveryResource
+metadata:
+  labels:
+    app.kubernetes.io/name: kuberecovery
+    app.kubernetes.io/managed-by: kustomize
+  name: recoveryresource-sample
+spec:
+  # Entire resource object saved here
+  apiVersion: v1
+  kind: Service
+  metadata:
+    labels: {}
+    annotations: {}
+    name: nginx
+  spec:
+    ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    selector:
+      app: nginx
+    type: ClusterIP

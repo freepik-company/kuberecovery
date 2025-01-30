@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- kuberecovery_v1_recoveryconfig.yaml
+- kuberecovery_v1_recoveryresource.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
