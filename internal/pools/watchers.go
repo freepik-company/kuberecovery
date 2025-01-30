@@ -22,10 +22,11 @@ import (
 
 // ResourceWatcher
 type ResourceWatcher struct {
-	Kind       string
-	APIVersion string
-	Namespace  string
-	Chan       chan struct{}
+	RecoveryConfigName string
+	Kind               string
+	APIVersion         string
+	Namespace          string
+	Chan               chan struct{}
 }
 
 // ResourceWatcherStore

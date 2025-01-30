@@ -41,6 +41,8 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 
 	logger := log.FromContext(ctx)
 
+	newInformers := make(map[string]bool)
+
 	// For each GVR included in the ResourcesIncluded section of the RecoveryConfig, we create an informer to watch
 	//delete events on the resources
 	// GV = GroupVersion (APIVersion) is a string, so just one group by ResourceIncluded is allowed
@@ -58,24 +60,21 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 			// For each namespace, we create an informer
 			for _, ns := range namespaces {
 
-				// Check if the informer is already created and added to the pool
-				_, exists := r.ResourceWatcherPool.Get(fmt.Sprintf("%s/%s/%s", res.APIVersion, kind, ns))
-
 				// Key to store the informer in the pool
-				resourceWatcherKey := fmt.Sprintf("%s/%s/%s", res.APIVersion, kind, ns)
+				resourceWatcherKey := fmt.Sprintf("%s/%s/%s/%s", resource.Name, res.APIVersion, kind, ns)
+				newInformers[resourceWatcherKey] = true
+
+				// Check if the informer is already created and added to the pool
+				resourceWatcher, exists := r.ResourceWatcherPool.Get(resourceWatcherKey)
 
 				// If the informer is in the pool and the event type is Deleted, we remove it from the pool
 				// and stop the informer
 				if exists && eventType == watch.Deleted {
-					// Get the resource watcher from the pool and if it does not exist, we return
-					resourceWatcher, exists := r.ResourceWatcherPool.Get(resourceWatcherKey)
-					if !exists {
-						return nil
-					}
+					logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", res.APIVersion, kind, ns))
 					// Delete the resource watcher from the pool and close the channel
 					r.ResourceWatcherPool.Delete(resourceWatcherKey)
 					close(resourceWatcher.Chan)
-					return nil
+					continue
 				}
 
 				// If the informer is not in the pool, we create it
@@ -86,10 +85,11 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 
 					// Create the resource watcher to add it to the pool
 					resourceWatcher := &pools.ResourceWatcher{
-						APIVersion: res.APIVersion,
-						Kind:       kind,
-						Namespace:  ns,
-						Chan:       make(chan struct{}),
+						RecoveryConfigName: resource.Name,
+						APIVersion:         res.APIVersion,
+						Kind:               kind,
+						Namespace:          ns,
+						Chan:               make(chan struct{}),
 					}
 
 					// Add the resource watcher to the pool and create the informer
@@ -97,6 +97,19 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 					go r.createInformer(ctx, resourceWatcher, resource)
 				}
 			}
+		}
+	}
+
+	// Get all the existing informers from the pool
+	existingInformers := r.ResourceWatcherPool.GetAll()
+
+	// For each informer in the pool, we check if it is not in the new resources list
+	// If it is not in the new resources list, we stop the informer and remove it from the pool
+	for key, watcher := range existingInformers {
+		if _, exists := newInformers[key]; !exists {
+			logger.Info(fmt.Sprintf("Stopping watching %s/%s in namespace %s", watcher.APIVersion, watcher.Kind, watcher.Namespace))
+			close(watcher.Chan)
+			r.ResourceWatcherPool.Delete(key)
 		}
 	}
 
@@ -200,7 +213,6 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 	}
 
 	// Run the informer until the channel stored in the pool is closed
-	defer close(resourceWatcher.Chan)
 	informer.Run(resourceWatcher.Chan)
 }
 
@@ -216,6 +228,8 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 	}
 
 	// Calculate the retention time for the RecoveryResource created
+	recoveryResourceName := fmt.Sprintf("%s-%s-%s-%s", recoveryConfig.Name, strings.ToLower(obj.GetKind()),
+		obj.GetName(), metav1.Now().UTC().Format("20060102150405"))
 	savedAt := metav1.Now().UTC().Format("2006-01-02T150405")
 	retentionUntil := metav1.Now().UTC().Add(parsedRetentionPeriod).Format("2006-01-02T150405")
 
@@ -225,7 +239,7 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 			"apiVersion": kuberecoveryv1alpha1.GroupVersion.String(),
 			"kind":       recoveryResourceType,
 			"metadata": map[string]interface{}{
-				"name": fmt.Sprintf("%s-%s-%s", recoveryConfig.Name, strings.ToLower(obj.GetKind()), obj.GetName()),
+				"name": recoveryResourceName,
 				"labels": map[string]interface{}{
 					recoveryResourceSavedAtLabel:        savedAt,
 					recoveryResourceRetainUntilLabel:    retentionUntil,

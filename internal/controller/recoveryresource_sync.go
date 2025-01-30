@@ -26,6 +26,8 @@ import (
 	kuberecoveryv1alpha1 "freepik.com/kuberecovery/api/v1alpha1"
 )
 
+// Sync checks if the resource is expired and deletes it if it is
+// Also recreate the resource if it has a specific label
 func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 	resource *kuberecoveryv1alpha1.RecoveryResource) (err error) {
 
@@ -37,7 +39,7 @@ func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 	// Parse the validUntil label to get the time
 	validUntil, err := time.Parse("2006-01-02T150405", validUnitlLabel)
 	if err != nil {
-		logger.Error(err, "Error parsing valid until label %s", validUnitlLabel)
+		return fmt.Errorf("error parsing valid until label %s: %w", validUnitlLabel, err)
 	}
 
 	// Check if the resource is expired
@@ -55,7 +57,7 @@ func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 		}
 		err = r.Delete(ctx, resource)
 		if err != nil {
-			logger.Error(err, "error deleting resource %s", resource.Name)
+			return fmt.Errorf("error deleting resource %s: %w", resource.Name, err)
 		}
 		return nil
 	}
