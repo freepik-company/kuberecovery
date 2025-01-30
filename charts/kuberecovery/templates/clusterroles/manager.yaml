@@ -1,13 +1,20 @@
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  name: {{ include "kuberecovery.fullname" . }}-manager
+  labels:
+    {{- include "kuberecovery.labels" . | nindent 4 }}
 rules:
 - apiGroups:
-  - kuberecovery.freepik.com
+  - '*'
   resources:
-  - recoveryconfigs
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
   verbs:
   - create
   - delete
@@ -19,21 +26,7 @@ rules:
 - apiGroups:
   - kuberecovery.freepik.com
   resources:
-  - recoveryconfigs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - kuberecovery.freepik.com
-  resources:
-  - recoveryconfigs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - kuberecovery.freepik.com
-  resources:
-  - recoveryresources
+  - clusteradmissionpolicies
   verbs:
   - create
   - delete
@@ -45,13 +38,13 @@ rules:
 - apiGroups:
   - kuberecovery.freepik.com
   resources:
-  - recoveryresources/finalizers
+  - clusteradmissionpolicies/finalizers
   verbs:
   - update
 - apiGroups:
   - kuberecovery.freepik.com
   resources:
-  - recoveryresources/status
+  - clusteradmissionpolicies/status
   verbs:
   - get
   - patch

@@ -1,100 +1,97 @@
-# kuberecovery
-// TODO(user): Add simple overview of use/purpose
+# KubeRecovery
+<img src="https://raw.githubusercontent.com/freepik-company/kuberecovery/master/docs/img/logo.png" alt="KubeRecovery Logo (Main) logo." width="150">
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+![GitHub go.mod Go version (subdirectory of monorepo)](https://img.shields.io/github/go-mod/go-version/freepik-company/kuberecovery)
+![GitHub](https://img.shields.io/github/license/freepik-company/kuberecovery)
 
-## Getting Started
+KubeRecovery is a Kubernetes operator that helps in recovering the resources that are deleted accidentally.
+Like a recycle bin, it provides a way to recover the resources that are deleted by mistake. It is a simple 
+operator that watches for the resources that are deleted and provides a way to recover them.
 
-### Prerequisites
-- go version v1.22.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+## Motivation
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+Has it ever happened to you that while using `k9s`, you accidentally pressed Ctrl+D on the only secret in the cluster that
+wasn’t versioned, and no matter how many times you hit Ctrl+Z, you couldn’t recover it? Or that you deleted a deployment
+and have no idea which image was running at that moment?
 
-```sh
-make docker-build docker-push IMG=<some-registry>/kuberecovery:tag
+Well, KubeRecovery is your solution. With KubeRecovery, you can recover mistakenly deleted resources as if they were in
+a recycle bin.
+
+## How it works
+
+KubeRecovery is based on just two components:
+* **RecoveryConfig**: This resource is responsible for defining which cluster resources you want to audit and recover 
+in case of a major disaster.
+```yaml
+apiVersion: kuberecovery.freepik.com/v1alpha1
+kind: RecoveryConfig
+metadata:
+  name: recoveryconfig-sample
+spec:
+
+  # Resources to watch and save as RecoveryResource object when they are deleted
+  # apiVersion and kind * is not supported, use specific version and kind instead
+  # For namespaces use "*" to watch all namespaces
+  resourcesIncluded:
+    - apiVersion: "apps/v1"
+      resources: ["deployments"]
+      namespaces: ["*"]
+    - apiVersion: "v1"
+      resources: ["services"]
+      namespaces: ["*"]
+
+  # Resources to exclude from watching and saving as RecoveryResource object
+  # apiVersion * is not supported, use specific apiVersion instead
+  # Namespaces and kind regexp are supported, so you can define * to exclude all resources of a kind or namespace
+  # or defau* to exclude all resources that start with defau
+  resourcesExcluded:
+    - apiVersion: "v1"
+      resources: ["services"]
+      namespaces: ["kube-system"]
+
+  # Retention period for RecoveryResource objects
+  # Just support us, ns, ms, s, m and h as time units
+  retention:
+    period: 240h
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
-
-**Install the CRDs into the cluster:**
-
-```sh
-make install
+* **RecoveryResource**: This resource is created when a resource is deleted. It contains all the necessary information 
+to restore the deleted resource.
+```yaml
+apiVersion: kuberecovery.freepik.com/v1alpha1
+kind: RecoveryResource
+metadata:
+  finalizers:
+  - kuberecovery.freepik.com/finalizer
+  # This finalizer is used to protect the resource from being deleted before the retentionUntil label date.
+  - kuberecovery.freepik.com/protectFinalizer
+  labels:
+    kuberecovery.freepik.com/recoveryConfig: recoveryconfig-sample
+    # This label is used to know when the resource is going to be deleted.
+    kuberecovery.freepik.com/retentionUntil: 2025-02-09T151001
+    # This label is used to know when the resource was saved at.
+    kuberecovery.freepik.com/savedAt: 2025-01-30T151001
+  name: recoveryconfig-sample-service-test-20250130151001
+spec:
+  <resource-deleted>
 ```
+If any RecoveryResource is tagged with `kuberecovery.freepik.com/recover` and set to `"true"`, the deleted resource will 
+be automatically restored.
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+## Deployment
+We recommend to deploy KubeRecovery operator with our [Helm registry](https://freepik-company.github.io/kuberecovery/).
 
-```sh
-make deploy IMG=<some-registry>/kuberecovery:tag
-```
+## How to collaborate
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+This project is done on top of [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder), so read about that project
+before collaborating. Of course, we are open to external collaborations for this project. For doing it you must fork the
+repository, make your changes to the code and open a PR. The code will be reviewed and tested (always)
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+> We are developers and hate bad code. For that reason we ask you the highest quality on each line of code to improve
+> this project on each iteration.
 
-```sh
-kubectl apply -k config/samples/
-```
-
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
-
-```sh
-kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
-
-## Project Distribution
-
-Following are the steps to build the installer and distribute this project to users.
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/kuberecovery:tag
-```
-
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
-
-2. Using the installer
-
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/kuberecovery/<tag or branch>/dist/install.yaml
-```
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+## Contributors
+🧑🏽‍🦱[@dfradehubs](https://github.com/dfradehubs) - Daniel Fradejas
 
 ## License
 
