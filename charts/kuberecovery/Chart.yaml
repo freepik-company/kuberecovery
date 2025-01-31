@@ -5,8 +5,8 @@ name: kuberecovery
 type: application
 description: >-
   A Helm chart for Kuberecovery, a tool for Kubernetes disaster recovery.
-version: 0.0.1 # chart version
-appVersion: "0.0.1" # kuberecovery version
+version: 0.0.2 # chart version
+appVersion: "0.0.2" # kuberecovery version
 kubeVersion: ">=1.22.0-0" # kubernetes version
 home: https://github.com/freepik-company/kuberecovery
 sources:

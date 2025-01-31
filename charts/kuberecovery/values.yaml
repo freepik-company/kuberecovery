@@ -13,8 +13,9 @@ controller:
     # If not set and create is true, a name is generated using the fullname template
     name: "kuberecovery-controller-manager"
 
-  replicaCount: 2
+  replicaCount: 1
 
+  extraArgs: []
   image:
     repository: ghcr.io/freepik-company/kuberecovery
     pullPolicy: IfNotPresent
@@ -22,10 +23,6 @@ controller:
     tag: ""
 
   imagePullSecrets: []
-
-  extraArgs:
-  - --webhook-server-autogenerate-certs=true
-  - --webhook-server-certs-secret-name=webhook-server-certs
 
   # Define a list of environment variables used inside the controller
   # Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#use-configmap-defined-environment-variables-in-pod-commands
