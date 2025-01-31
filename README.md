@@ -30,7 +30,7 @@ metadata:
 spec:
 
   # Resources to watch and save as RecoveryResource object when they are deleted
-  # apiVersion and kind * is not supported, use specific version and kind instead
+  # apiVersion and resources * is not supported, use specific version and resource instead
   # For namespaces use "*" to watch all namespaces
   resourcesIncluded:
     - apiVersion: "apps/v1"
@@ -42,7 +42,7 @@ spec:
 
   # Resources to exclude from watching and saving as RecoveryResource object
   # apiVersion * is not supported, use specific apiVersion instead
-  # Namespaces and kind regexp are supported, so you can define * to exclude all resources of a kind or namespace
+  # Namespaces and resources regexp are supported, so you can define * to exclude all resources of a resource or namespace
   # or defau* to exclude all resources that start with defau
   resourcesExcluded:
     - apiVersion: "v1"
