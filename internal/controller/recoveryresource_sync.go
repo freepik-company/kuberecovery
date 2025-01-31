@@ -84,6 +84,15 @@ func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 	if restoreTriggerLabel == recoveryResourceRestoreLabelValue {
 		logger.Info(fmt.Sprintf(resourceRestoreMessage, resource.Name))
 
+		// Remove the restore label to avoid restoring the resource again
+		defer func() {
+			delete(resource.GetLabels(), recoveryResourceRestoreLabel)
+			err = r.Update(ctx, resource)
+			if err != nil {
+				logger.Info(fmt.Sprintf(deleteRestoreLabelError, resource.Name, err))
+			}
+		}()
+
 		// Unmarshal the RawExtension to the object to get unstructured.Unstructured
 		var resourceToRestore unstructured.Unstructured
 		if err := json.Unmarshal(resource.Spec.Raw, &resourceToRestore.Object); err != nil {
@@ -114,13 +123,6 @@ func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 		_, err = dynamicClient.Create(ctx, &resourceToRestore, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf(createResourceError, resourceToRestore.GetName(), err)
-		}
-
-		// Remove the restore label to avoid restoring the resource again
-		delete(resource.GetLabels(), recoveryResourceRestoreLabel)
-		err = r.Update(ctx, resource)
-		if err != nil {
-			return fmt.Errorf(deleteRestoreLabelError, resource.Name, err)
 		}
 
 		logger.Info(fmt.Sprintf(resourceRestoredSuccessfullyMessage, resource.Name,
