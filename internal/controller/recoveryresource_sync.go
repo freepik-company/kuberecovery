@@ -122,6 +122,10 @@ func (r *RecoveryResourceReconciler) Sync(ctx context.Context,
 		if err != nil {
 			return fmt.Errorf(deleteRestoreLabelError, resource.Name, err)
 		}
+
+		logger.Info(fmt.Sprintf(resourceRestoredSuccessfullyMessage, resource.Name,
+			resourceToRestore.GroupVersionKind().Group, resourceToRestore.GroupVersionKind().Version,
+			resourceToRestore.GroupVersionKind().Kind, resourceToRestore.GetNamespace(), resourceToRestore.GetName()))
 	}
 
 	return nil

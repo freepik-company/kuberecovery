@@ -65,6 +65,7 @@ const (
 	startWatchingResourceMessage        = "Watching %s/%s in namespace %s"
 	resourceExcludedFromRecoveryMessage = "Resource %s/%s/%s is excluded from recovery"
 	recoveryResourceSavedMessage        = "Resource %s/%s/%s/%s saved as RecoveryResource %s"
+	resourceRestoredSuccessfullyMessage = "Resource %s has been restored as %s/%s %s %s/%s successfully"
 
 	// Finalizer
 	resourceFinalizer              = "kuberecovery.freepik.com/finalizer"

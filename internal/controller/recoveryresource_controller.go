@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -127,6 +128,7 @@ func (r *RecoveryResourceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 func (r *RecoveryResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kuberecoveryv1alpha1.RecoveryResource{}).
+		WithEventFilter(predicate.LabelChangedPredicate{}).
 		Named("recoveryresource").
 		Complete(r)
 }

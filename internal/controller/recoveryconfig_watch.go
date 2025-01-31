@@ -37,8 +37,11 @@ import (
 )
 
 // fields excluded to save in the RecoveryResource spec
-var fieldsExcludedFromRecoveryResource = map[string][]string{
-	"metadata": {"resourceVersion", "uid", "creationTimestamp"},
+var fieldsExcludedFromMetadataRecoveryResource = []string{
+	"resourceVersion",
+	"uid",
+	"creationTimestamp",
+	"managedFields",
 }
 
 // Watch watches the resources included in the RecoveryConfig and creates informers to watch delete events
@@ -246,8 +249,8 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 	retainUntil := now.Add(parsedRetentionPeriod).Format(timeParseFormat)
 
 	// Remove the fields that are not needed in the RecoveryResource
-	for _, field := range fieldsExcludedFromRecoveryResource {
-		unstructured.RemoveNestedField(obj.Object, field...)
+	for _, field := range fieldsExcludedFromMetadataRecoveryResource {
+		unstructured.RemoveNestedField(obj.Object, "metadata", field)
 	}
 
 	// Create the RecoveryResource object
