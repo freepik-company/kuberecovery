@@ -50,7 +50,7 @@ spec:
       namespaces: ["kube-system"]
 
   # Retention period for RecoveryResource objects
-  # Just support us, ns, ms, s, m and h as time units
+  # Just support us, ns, ms, s, m, h and d as time units
   retention:
     period: 240h
 ```
