@@ -38,7 +38,7 @@ const (
 	defaultSyncInterval = "1m"
 
 	// Formats
-	recoveryResourceNameFormat = "%s-%s-%s-%s"
+	recoveryResourceNameFormat = "%s-%s-%s"
 	timeParseFormat            = "2006-01-02T150405"
 	timeParseFormatName        = "20060102150405"
 
@@ -84,7 +84,6 @@ const (
 	recoveryResourceSavedAtLabel        = "kuberecovery.freepik.com/savedAt"
 	recoveryResourceRecoveryConfigLabel = "kuberecovery.freepik.com/recoveryConfig"
 	recoveryResourceRestoreLabel        = "kuberecovery.freepik.com/restore"
-	recoveryResourceRetentionTimeLabel  = "kuberecovery.freepik.com/retentionTime"
 	recoveryResourceRestoreLabelValue   = "true"
 )
 

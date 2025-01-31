@@ -261,7 +261,7 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 
 	// Create the labels for the RecoveryResource: Name, savedAt and retainUntil
 	now := metav1.Now().UTC()
-	recoveryResourceName = fmt.Sprintf(recoveryResourceNameFormat, recoveryConfig.Name, strings.ToLower(obj.GetKind()),
+	recoveryResourceName = fmt.Sprintf(recoveryResourceNameFormat, strings.ToLower(obj.GetKind()),
 		obj.GetName(), now.Format(timeParseFormatName))
 	savedAt := now.Format(timeParseFormat)
 	retainUntil := now.Add(parsedRetentionPeriod).Format(timeParseFormat)
@@ -282,7 +282,6 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 					recoveryResourceSavedAtLabel:        savedAt,
 					recoveryResourceRetainUntilLabel:    retainUntil,
 					recoveryResourceRecoveryConfigLabel: recoveryConfig.Name,
-					recoveryResourceRetentionTimeLabel:  retentionPeriod,
 				},
 			},
 			"spec": obj.Object,
