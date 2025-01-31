@@ -18,15 +18,17 @@ package pools
 
 import (
 	"sync"
+
+	kuberecoveryv1alpha1 "freepik.com/kuberecovery/api/v1alpha1"
 )
 
 // ResourceWatcher
 type ResourceWatcher struct {
-	RecoveryConfigName string
-	Resource           string
-	APIVersion         string
-	Namespace          string
-	Chan               chan struct{}
+	RecoveryConfig *kuberecoveryv1alpha1.RecoveryConfig
+	Resource       string
+	APIVersion     string
+	Namespace      string
+	Chan           chan struct{}
 }
 
 var (

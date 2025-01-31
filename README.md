@@ -71,6 +71,8 @@ metadata:
     kuberecovery.freepik.com/retentionUntil: 2025-02-09T151001
     # This label is used to know when the resource was saved at.
     kuberecovery.freepik.com/savedAt: 2025-01-30T151001
+    # This label is used to know the retention time of the resource if you don't want to calculate it by yourself.
+    kuberecovery.freepik.com/retentionTime: 10d
   name: recoveryconfig-sample-service-test-20250130151001
 spec:
   <resource-deleted>

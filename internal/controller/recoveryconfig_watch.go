@@ -19,10 +19,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -89,6 +88,16 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 					continue
 				}
 
+				// If exists, check if the resource saved in the pool is the same as the resource in the RecoveryConfig
+				if exists {
+					if !reflect.DeepEqual(resourceWatcher.RecoveryConfig.Spec, resource.Spec) {
+						logger.Info(fmt.Sprintf(recoveryConfigChangedMessage, resourceWatcherKey))
+						// Update the resource in the pool with the new RecoveryConfig
+						resourceWatcher.RecoveryConfig = resource
+						r.ResourceWatcherPool.Set(resourceWatcherKey, resourceWatcher)
+					}
+				}
+
 				// If the informer is not in the pool, we create it
 				if !exists {
 
@@ -97,16 +106,16 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 
 					// Create the resource watcher to add it to the pool
 					resourceWatcher := &pools.ResourceWatcher{
-						RecoveryConfigName: resource.Name,
-						APIVersion:         res.APIVersion,
-						Resource:           rsc,
-						Namespace:          ns,
-						Chan:               make(chan struct{}),
+						RecoveryConfig: resource,
+						APIVersion:     res.APIVersion,
+						Resource:       rsc,
+						Namespace:      ns,
+						Chan:           make(chan struct{}),
 					}
 
 					// Add the resource watcher to the pool and create the informer
 					r.ResourceWatcherPool.Set(resourceWatcherKey, resourceWatcher)
-					go r.createInformer(ctx, resourceWatcher, resource)
+					go r.createInformer(ctx, resourceWatcher, resourceWatcherKey)
 				}
 			}
 		}
@@ -118,7 +127,7 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 	// For each informer in the pool, we check if it is not in the new resources list
 	// If it is not in the new resources list, we stop the informer and remove it from the pool
 	for key, watcher := range existingInformers {
-		if resource.Name == watcher.RecoveryConfigName {
+		if resource.Name == watcher.RecoveryConfig.Name {
 			if _, exists := newInformers[key]; !exists {
 				logger.Info(fmt.Sprintf(stopWatchingResourceMessage, watcher.APIVersion, watcher.Resource, watcher.Namespace))
 				close(watcher.Chan)
@@ -132,7 +141,7 @@ func (r *RecoveryConfigReconciler) Watch(ctx context.Context, eventType watch.Ev
 
 // createInformer creates an informer for the resource specified in the resourceWatcher
 func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceWatcher *pools.ResourceWatcher,
-	recoveryConfig *kuberecoveryv1alpha1.RecoveryConfig) {
+	resourceWatcherKey string) {
 
 	logger := log.FromContext(ctx)
 
@@ -167,6 +176,14 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		// Listen for delete events
 		DeleteFunc: func(obj interface{}) {
+
+			// Get the recoveryConfig from the pool
+			watchedResource, exists := r.ResourceWatcherPool.Get(resourceWatcherKey)
+			if !exists {
+				logger.Info(fmt.Sprintf(recoveryConfigNotExistsInPoolError, resourceWatcherKey))
+				return
+			}
+			recoveryConfig := watchedResource.RecoveryConfig
 
 			// Get the object deleted as unstructured object
 			unstructuredObj, ok := obj.(*unstructured.Unstructured)
@@ -265,6 +282,7 @@ func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj
 					recoveryResourceSavedAtLabel:        savedAt,
 					recoveryResourceRetainUntilLabel:    retainUntil,
 					recoveryResourceRecoveryConfigLabel: recoveryConfig.Name,
+					recoveryResourceRetentionTimeLabel:  retentionPeriod,
 				},
 			},
 			"spec": obj.Object,
