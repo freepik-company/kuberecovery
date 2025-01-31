@@ -2,6 +2,36 @@ apiVersion: v1
 entries:
   kuberecovery:
   - apiVersion: v2
+    appVersion: 0.0.2
+    created: "2025-01-31T11:49:39.443696323Z"
+    description: A Helm chart for Kuberecovery, a tool for Kubernetes disaster recovery.
+    digest: 9d4fd97292892315baba85fcf12f8957c37715deb97ada37e746140552f72883
+    home: https://github.com/freepik-company/kuberecovery
+    keywords:
+    - freepik
+    - prosimcorp
+    - kuberecovery
+    - gitops
+    - disaster recovery
+    - kubernetes
+    kubeVersion: '>=1.22.0-0'
+    maintainers:
+    - email: dfradejas@freepik.com
+      name: Daniel Fradejas
+      url: https://github.com/dfradehubs
+    - email: ahernandez@freepik.com
+      name: Alby Hernández
+      url: https://github.com/achetronic
+    - name: prosimcorp
+      url: https://github.com/prosimcorp
+    name: kuberecovery
+    sources:
+    - https://github.com/freepik-company/kuberecovery
+    type: application
+    urls:
+    - kuberecovery-0.0.2.tgz
+    version: 0.0.2
+  - apiVersion: v2
     appVersion: 0.0.1
     created: "2025-01-31T11:32:18.323941303Z"
     description: A Helm chart for Kuberecovery, a tool for Kubernetes disaster recovery.
@@ -31,4 +61,4 @@ entries:
     urls:
     - kuberecovery-0.0.1.tgz
     version: 0.0.1
-generated: "2025-01-31T11:32:18.323947044Z"
+generated: "2025-01-31T11:49:39.443710339Z"
