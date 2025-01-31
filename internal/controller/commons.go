@@ -17,6 +17,11 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"freepik.com/kuberecovery/internal/globals"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/restmapper"
@@ -54,6 +59,7 @@ const (
 	convertToUnstructuredError     = "failed to convert object to unstructured object: %v"
 	regexResourceError             = "failed to regex resource to exclude %s: %v"
 	regexNamespaceError            = "failed to regex namespace to exclude %s: %v"
+	parseDurationWithDaysError     = "failed to parse duration with days %s: %v"
 	saveRecoveryResourceError      = "Failed to save resource %s/%s/%s/%s as RecoveryResource: %v"
 	resourceWatcherError           = "error creating event handler for resource %s/%s: %v"
 	recoveryResourceCreationError  = "error creating recoveryResource %s in the cluster: %w"
@@ -105,4 +111,21 @@ func getResourceFromKind(group, version, kind string) (string, error) {
 
 	// Return the resource
 	return mapping.Resource.Resource, nil
+}
+
+// parseDurationWithDays converts "Xd" into X days, or calls time.ParseDuration for formats like "12h"
+func parseDurationWithDays(input string) (time.Duration, error) {
+	// If the string ends with 'd', interpret it as days
+	if strings.HasSuffix(input, "d") {
+		daysStr := strings.TrimSuffix(input, "d")
+		days, err := strconv.Atoi(daysStr)
+		if err != nil {
+			return 0, fmt.Errorf(parseDurationWithDaysError, input, err)
+		}
+		// Convert the number of days into hours as a time.Duration
+		return time.Duration(days) * 24 * time.Hour, nil
+	}
+
+	// Otherwise, parse directly with time.ParseDuration
+	return time.ParseDuration(input)
 }

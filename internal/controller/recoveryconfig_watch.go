@@ -231,41 +231,6 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 	informer.Run(resourceWatcher.Chan)
 }
 
-// parseDurationWithDays converts an input like "3d12h" into a time.Duration by extracting days (3d->72h), parsing the leftover (12h), and summing both.
-func parseDurationWithDays(input string) (time.Duration, error) {
-    re := regexp.MustCompile(`(\d+)d`)
-    match := re.FindStringSubmatch(input)
-
-	// If no "Xd" pattern is found, parse directly with time.ParseDuration
-    if len(match) < 2 {
-        return time.ParseDuration(input)
-    }
-
-	// match[1] is the numeric part before the 'd'
-    days, err := strconv.Atoi(match[1])
-    if err != nil {
-        return 0, fmt.Errorf("error parsing days: %w", err)
-    }
-
-	// Remove the "Xd" portion from the input string
-    daysLiteral := match[0]
-    remainder := strings.Replace(input, daysLiteral, "", 1)
-    remainder = strings.TrimSpace(remainder)
-
-    var leftoverDuration time.Duration
-    if remainder != "" {
-        leftoverDuration, err = time.ParseDuration(remainder)
-        if err != nil {
-            return 0, fmt.Errorf("error parsing remainder (%q): %w", remainder, err)
-        }
-    }
-
-	// Convert the captured number of days into hours as a time.Duration
-    total := leftoverDuration + time.Duration(days)*24*time.Hour
-    return total, nil
-}
-
-
 // saveRecoveryResource saves the resource deleted as RecoveryResource in the cluster
 func (r *RecoveryConfigReconciler) saveRecoveryResource(ctx context.Context, obj *unstructured.Unstructured,
 	recoveryConfig *kuberecoveryv1alpha1.RecoveryConfig) (recoveryResourceName string, err error) {
