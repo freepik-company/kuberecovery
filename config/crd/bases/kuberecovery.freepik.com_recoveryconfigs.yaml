@@ -52,6 +52,10 @@ spec:
                   properties:
                     apiVersion:
                       type: string
+                    names:
+                      items:
+                        type: string
+                      type: array
                     namespaces:
                       items:
                         type: string
@@ -71,6 +75,10 @@ spec:
                   properties:
                     apiVersion:
                       type: string
+                    names:
+                      items:
+                        type: string
+                      type: array
                     namespaces:
                       items:
                         type: string

@@ -42,12 +42,13 @@ spec:
 
   # Resources to exclude from watching and saving as RecoveryResource object
   # apiVersion * is not supported, use specific apiVersion instead
-  # Namespaces and resources regexp are supported, so you can define * to exclude all resources of a resource or namespace
-  # or defau* to exclude all resources that start with defau
+  # Namespaces, names and resources regexp are supported, so you can define * to exclude all resources
+  # of a resource or namespace or defau* to exclude all resources that start with defau
   resourcesExcluded:
     - apiVersion: "v1"
       resources: ["services"]
       namespaces: ["kube-system"]
+      names: ["*"]
 
   # Retention period for RecoveryResource objects
   # Just support us, ns, ms, s, m, h and d as time units

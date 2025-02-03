@@ -204,24 +204,31 @@ func (r *RecoveryConfigReconciler) createInformer(ctx context.Context, resourceW
 			for _, excluded := range recoveryConfig.Spec.ResourcesExcluded {
 				for _, excludedResource := range excluded.Resources {
 					for _, excludedNamespace := range excluded.Namespaces {
+						for _, excludedName := range excluded.Names {
 
-						// resource and namespace can be regex
-						resourceMatched, err := regexp.MatchString(excludedResource, resource)
-						if err != nil {
-							logger.Info(fmt.Sprintf(regexResourceError, resource, err))
-							return
-						}
-						namespaceMatched, err := regexp.MatchString(excludedNamespace, unstructuredObj.GetNamespace())
-						if err != nil {
-							logger.Info(fmt.Sprintf(regexNamespaceError, unstructuredObj.GetNamespace(), err))
-							return
-						}
+							// resource and namespace can be regex
+							resourceMatched, err := regexp.MatchString(excludedResource, resource)
+							if err != nil {
+								logger.Info(fmt.Sprintf(regexResourceError, resource, err))
+								return
+							}
+							namespaceMatched, err := regexp.MatchString(excludedNamespace, unstructuredObj.GetNamespace())
+							if err != nil {
+								logger.Info(fmt.Sprintf(regexNamespaceError, unstructuredObj.GetNamespace(), err))
+								return
+							}
+							nameMatched, err := regexp.MatchString(excludedName, unstructuredObj.GetName())
+							if err != nil {
+								logger.Info(fmt.Sprintf(regexNameError, unstructuredObj.GetName(), err))
+								return
+							}
 
-						// Check if the resource is excluded, if true we do not save it as RecoveryResource
-						if excluded.APIVersion == unstructuredObj.GetAPIVersion() && resourceMatched && namespaceMatched {
-							logger.Info(fmt.Sprintf(resourceExcludedFromRecoveryMessage, unstructuredObj.GetAPIVersion(),
-								resource, unstructuredObj.GetNamespace()))
-							return
+							// Check if the resource is excluded, if true we do not save it as RecoveryResource
+							if excluded.APIVersion == unstructuredObj.GetAPIVersion() && resourceMatched && namespaceMatched && nameMatched {
+								logger.Info(fmt.Sprintf(resourceExcludedFromRecoveryMessage, unstructuredObj.GetAPIVersion(),
+									resource, unstructuredObj.GetNamespace()))
+								return
+							}
 						}
 					}
 				}

@@ -59,6 +59,7 @@ const (
 	convertToUnstructuredError         = "failed to convert object to unstructured object: %v"
 	regexResourceError                 = "failed to regex resource to exclude %s: %v"
 	regexNamespaceError                = "failed to regex namespace to exclude %s: %v"
+	regexNameError                     = "failed to regex name to exclude %s: %v"
 	parseDurationWithDaysError         = "failed to parse duration with days %s: %v"
 	saveRecoveryResourceError          = "Failed to save resource %s/%s/%s/%s as RecoveryResource: %v"
 	resourceWatcherError               = "error creating event handler for resource %s/%s: %v"

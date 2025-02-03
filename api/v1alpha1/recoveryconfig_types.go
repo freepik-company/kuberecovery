@@ -30,6 +30,7 @@ type GvrResourceT struct {
 	APIVersion string   `json:"apiVersion"`
 	Resources  []string `json:"resources"`
 	Namespaces []string `json:"namespaces,omitempty"`
+	Names      []string `json:"names,omitempty"`
 }
 
 // RecoveryConfigSpec defines the desired state of RecoveryConfig.
