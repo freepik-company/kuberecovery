@@ -76,7 +76,7 @@ metadata:
 spec:
   <resource-deleted>
 ```
-If any RecoveryResource is tagged with `kuberecovery.freepik.com/recover` and set to `"true"`, the deleted resource will 
+If any RecoveryResource is tagged with `kuberecovery.freepik.com/restore` and set to `"true"`, the deleted resource will 
 be automatically restored.
 
 ## Deployment
